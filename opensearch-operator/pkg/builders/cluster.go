@@ -185,6 +185,22 @@ func NewSTSForNodePool(
 
 	image := helpers.ResolveImage(cr, &node)
 
+	var mainCommand []string
+	var com string
+	com = "yes | ./bin/opensearch-plugin install"
+	if len(cr.Spec.General.PluginsList) > 0 {
+		mainCommand = append(mainCommand, "/bin/bash", "-c")
+		for index, plugin := range cr.Spec.General.PluginsList {
+			fmt.Println(index, plugin)
+			com = com + " '" + strings.Replace(plugin, "'", "\\'", -1) + "'"
+		}
+
+		com = com + " ; ./opensearch-docker-entrypoint.sh"
+		mainCommand = append(mainCommand, com)
+	} else {
+		mainCommand = []string{"/bin/bash", "-c", "./opensearch-docker-entrypoint.sh"}
+	}
+
 	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name + "-" + node.Component,
@@ -266,6 +282,7 @@ func NewSTSForNodePool(
 								},
 							},
 							Name:            "opensearch",
+							Command:         mainCommand,
 							Image:           image.GetImage(),
 							ImagePullPolicy: image.GetImagePullPolicy(),
 							Resources:       node.Resources,
